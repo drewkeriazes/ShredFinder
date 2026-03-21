@@ -1,0 +1,43 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+
+# Media files (large)
+*.mp4
+*.MP4
+*.LRV
+*.THM
+*.bin
+
+# Whitelist test GPMF binary samples (small, needed for tests)
+!test_gpmf.bin
+!test_gpmf_long.bin
+!test_gpmf_007.bin
+!test_gpmf_009.bin
+
+# Output directories
+clips/
+output/
+telemetry/
+events/
+
+# Environment
+.env
+.venv/
+venv/
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+FOOTAGE_REFERENCE.txt
+.claude/settings.local.json
