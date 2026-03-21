@@ -2,6 +2,99 @@
 
 Automatically detect highlight moments in GoPro snowboard footage and cut clips. Analyzes embedded sensor telemetry (accelerometer, gyroscope, GPS) to find jumps, spins, speed peaks, and crashes — then cuts clips via FFmpeg with no re-encoding.
 
+---
+
+## Easy Setup (Non-Developers)
+
+If you just want to use ShredFinder and don't have a coding background, follow these steps. You'll only need to do the setup once — after that it's just one command to process your footage.
+
+### Step 1: Install Python
+
+1. Go to https://www.python.org/downloads/
+2. Click the big yellow **"Download Python"** button
+3. Run the installer
+4. **IMPORTANT:** Check the box that says **"Add Python to PATH"** at the bottom of the installer before clicking Install
+
+To verify it worked, open **Command Prompt** (search "cmd" in the Start menu) and type:
+```
+python --version
+```
+You should see something like `Python 3.13.7`. If you get an error, restart your computer and try again.
+
+### Step 2: Install FFmpeg
+
+1. Open **Command Prompt** (search "cmd" in the Start menu)
+2. Paste this command and hit Enter:
+```
+winget install Gyan.FFmpeg
+```
+3. Close and reopen Command Prompt after it finishes
+
+### Step 3: Download ShredFinder
+
+1. Go to https://github.com/drewkeriazes/ShredFinder
+2. Click the green **"Code"** button, then click **"Download ZIP"**
+3. Unzip the folder somewhere easy to find (like your Desktop or Downloads)
+4. Open **Command Prompt** and navigate to the folder:
+```
+cd Desktop\ShredFinder-master
+```
+5. Install ShredFinder:
+```
+pip install -e .
+```
+
+### Step 4: Process Your GoPro Footage
+
+1. Plug in your GoPro SD card or copy your `.MP4` files to a folder on your computer
+2. Open **Command Prompt** and run:
+```
+shredfinder "D:\DCIM\100GOPRO"
+```
+Replace the path in quotes with wherever your GoPro files are. Right-click the folder in File Explorer and click "Copy as path" to get the exact path.
+
+That's it! ShredFinder will:
+- Scan all your GoPro files
+- Find your best jumps, spins, speed runs, and crashes
+- Cut clips into a `clips/` folder organized by type (jumps, spins, etc.)
+- Generate a summary report
+
+### Common Options
+
+```
+shredfinder "D:\DCIM\100GOPRO" --dry-run
+```
+Preview what it finds without cutting any clips (good for testing).
+
+```
+shredfinder "D:\DCIM\100GOPRO" --trail-map
+```
+Generate an interactive map of your GPS tracks you can open in a browser.
+
+```
+shredfinder "D:\DCIM\100GOPRO" --reel --top-n 10
+```
+Automatically create a highlight reel of your 10 best moments.
+
+```
+shredfinder "D:\DCIM\100GOPRO" --stats
+```
+See your season stats — top speed, biggest air, vertical feet, etc.
+
+### Troubleshooting
+
+- **"shredfinder is not recognized"** — Close and reopen Command Prompt, or try `python -m shredfinder.cli` instead
+- **"python is not recognized"** — You need to reinstall Python and make sure to check "Add Python to PATH"
+- **"ffmpeg not found"** — Close and reopen Command Prompt after installing FFmpeg
+- **"No events detected"** — Try relaxing the detection: `shredfinder "your/path" --g-threshold 6 --min-landing-g 10`
+- **Files not found** — Make sure the path points to the folder with `.MP4` files, not individual files
+
+---
+
+## Developer Setup
+
+Everything below is the full technical documentation.
+
 ## Requirements
 
 - **Python** 3.10+
