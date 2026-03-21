@@ -56,8 +56,10 @@ Replace the path in quotes with wherever your GoPro files are. Right-click the f
 That's it! ShredFinder will:
 - Scan all your GoPro files
 - Find your best jumps, spins, speed runs, and crashes
-- Cut clips into a `clips/` folder organized by type (jumps, spins, etc.)
+- Cut clips into a `clips/run_<timestamp>_<id>/` folder organized by type
 - Generate a summary report
+
+Each run gets its own folder with a unique ID so you can compare different runs and settings without overwriting previous results.
 
 ### Common Options
 
@@ -83,7 +85,7 @@ See your season stats — top speed, biggest air, vertical feet, etc.
 
 ### Troubleshooting
 
-- **"shredfinder is not recognized"** — Close and reopen Command Prompt, or try `python -m shredfinder.cli` instead
+- **"shredfinder is not recognized"** — Close and reopen Command Prompt, or try `python -m shredfinder` instead
 - **"python is not recognized"** — You need to reinstall Python and make sure to check "Add Python to PATH"
 - **"ffmpeg not found"** — Close and reopen Command Prompt after installing FFmpeg
 - **"No events detected"** — Try relaxing the detection: `shredfinder "your/path" --g-threshold 6 --min-landing-g 10`
@@ -116,7 +118,7 @@ Or without installing:
 
 ```bash
 pip install click pandas numpy
-python -m shredfinder.cli --help
+python -m shredfinder --help
 ```
 
 ### Installing FFmpeg
@@ -194,24 +196,32 @@ shredfinder INPUT_DIR [OPTIONS]
 
 ## Output Structure
 
+Each run creates a unique folder with a timestamp and ID:
+
 ```
 clips/
-  jumps/           Jump clips (filenames include landing quality)
-  speed/           Speed peak clips
-  spins/           Spin clips (filenames include degree count)
-  crashes/         Crash/bail clips
-  by_source/       Symlinks grouped by source MP4 file
-    GX010185/
-    GX010207/
-  manifest.csv     Full manifest of all clips with metadata
-  summary.txt      Human-readable report
-  timeline.edl     DaVinci Resolve timeline (with --export-edl)
-  tracks.gpx       GPS tracks + waypoints (with --export-gpx)
-  trail_map.html   Interactive map (with --trail-map)
-  stats.txt        Season stats text (with --stats)
-  stats.json       Season stats JSON (with --stats)
-  highlight_reel.mp4  Top clips concatenated (with --reel)
+  run_20260321_143000_a3f8c1b2/
+    run.json           Run metadata (ID, settings, results)
+    manifest.csv       Full manifest of all clips with metadata
+    summary.txt        Human-readable report
+    jumps/             Jump clips (filenames include landing quality)
+    speed/             Speed peak clips
+    spins/             Spin clips (filenames include degree count)
+    crashes/           Crash/bail clips
+    by_source/         Symlinks grouped by source MP4 file
+      GX010185/
+      GX010207/
+    timeline.edl       DaVinci Resolve timeline (with --export-edl)
+    tracks.gpx         GPS tracks + waypoints (with --export-gpx)
+    trail_map.html     Interactive map (with --trail-map)
+    stats.txt          Season stats text (with --stats)
+    stats.json         Season stats JSON (with --stats)
+    highlight_reel.mp4 Top clips concatenated (with --reel)
+  run_20260321_150000_7e2d9f41/
+    ...                Another run with different settings
 ```
+
+The `run.json` file records the run ID, input directory, all detection settings, and results so you can compare runs.
 
 ## Config File
 
@@ -300,6 +310,7 @@ python -c "import shredfinder; print(shredfinder.__version__)"
 
 ```
 shredfinder/
+  __main__.py       Enables `python -m shredfinder`
   cli.py            Click CLI entry point
   scanner.py        MP4 file discovery
   telemetry.py      GPMF extraction, DataFrame building, segment classification

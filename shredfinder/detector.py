@@ -482,14 +482,17 @@ def _detect_crashes(
         if ts[i] - last_crash_ts < 5.0:
             continue  # cooldown
 
-        # Check speed before and after the spike
+        # Check speed before and after the spike — require confirmed GPS
         speed_before = _speed_at_timestamp(speed_at_time, float(ts[i]) - 1.0)
         speed_after = _speed_at_timestamp(speed_at_time, float(ts[i]) + 3.0)
 
+        # Require GPS data — can't confirm a crash without speed context
+        if speed_before < 0 or speed_after < 0:
+            continue
         # Must be moving before and stopped after
-        if speed_before >= 0 and speed_before < 5.0:
+        if speed_before < 5.0:
             continue  # wasn't really moving
-        if speed_after >= 0 and speed_after > 5.0:
+        if speed_after > 5.0:
             continue  # didn't stop — probably just a hard landing
 
         # Check for tumbling via GYRO (multi-axis high rotation)

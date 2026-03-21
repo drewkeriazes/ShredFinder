@@ -2,6 +2,8 @@
 
 import logging
 import sys
+import uuid
+from datetime import datetime
 from pathlib import Path
 
 import click
@@ -110,10 +112,19 @@ def cli(
     filter_chairlift = (not no_chairlift_filter) and det.get("filter_chairlift", True)
     organize = not no_organize and out.get("organize", True)
     output_dir = output_dir if output_dir is not None else out["output_dir"]
-    output_path = Path(output_dir)
+
+    # Generate a unique run ID and create a run-specific output folder
+    run_id = uuid.uuid4().hex[:8]
+    run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_folder = f"run_{run_timestamp}_{run_id}"
+    output_path = Path(output_dir) / run_folder
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    click.echo(f"Run ID: {run_id}")
+    click.echo(f"Output: {output_path}")
 
     # --- Scan footage ---
-    click.echo(f"Scanning {input_dir} for MP4 files...")
+    click.echo(f"\nScanning {input_dir} for MP4 files...")
     try:
         files = scan_footage(input_dir)
     except FileNotFoundError as e:
@@ -265,6 +276,36 @@ def cli(
 
     summary = write_summary(results, output_path / "summary.txt", no_telemetry)
     click.echo(f"\n{summary}")
+
+    # --- Write run metadata ---
+    import json
+    run_meta = {
+        "run_id": run_id,
+        "timestamp": run_timestamp,
+        "input_dir": str(input_dir),
+        "settings": {
+            "g_threshold": g_threshold,
+            "min_airtime_sec": min_airtime_sec,
+            "min_landing_g": min_landing_g,
+            "min_speed_mph": min_speed_mph,
+            "min_spin_degrees": min_spin_degrees,
+            "spin_axis": spin_axis,
+            "crash_g_threshold": crash_g_threshold,
+            "clip_pad_sec": clip_pad_sec,
+            "clip_max_sec": clip_max_sec,
+            "filter_chairlift": filter_chairlift,
+        },
+        "results": {
+            "files_processed": len(files),
+            "files_with_events": len(events_by_file),
+            "total_events": total_events,
+            "clips_cut": success_count,
+            "clips_failed": fail_count,
+        },
+    }
+    run_meta_path = output_path / "run.json"
+    run_meta_path.write_text(json.dumps(run_meta, indent=2))
+    click.echo(f"Run metadata: {run_meta_path}")
 
 
 def _print_event(e) -> None:
