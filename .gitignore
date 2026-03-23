@@ -40,4 +40,8 @@ node_modules/
 .DS_Store
 Thumbs.db
 FOOTAGE_REFERENCE.txt
-.claude/settings.local.json
+# Claude Code
+.claude/
+CLAUDE.md
+server/CLAUDE.md
+web/CLAUDE.md
