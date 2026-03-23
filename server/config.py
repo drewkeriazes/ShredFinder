@@ -23,7 +23,8 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # --- Auth ---
-    SECRET_KEY: str = secrets.token_urlsafe(32)
+    # Fixed default for dev — override via SECRET_KEY env var in production
+    SECRET_KEY: str = "shredfinder-dev-secret-key-change-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 1 week
 
     # --- Database ---
