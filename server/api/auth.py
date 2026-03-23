@@ -108,7 +108,6 @@ async def get_current_user_or_token_param(
     session: AsyncSession = Depends(get_session),
 ) -> User:
     """Accept auth from header OR ?token= query param. Used for img/video src URLs."""
-    from fastapi import Query
     token = request.query_params.get("token")
     if not token:
         auth_header = request.headers.get("authorization", "")

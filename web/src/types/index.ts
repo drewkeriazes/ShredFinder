@@ -99,19 +99,3 @@ export interface DetectionResult {
   clips: DetectedClip[];
 }
 
-export interface ApiResponse<T> {
-  data: T;
-  error?: string;
-}
-
-export interface LoginResponse {
-  token: string;
-  user: User;
-}
-
-export interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
