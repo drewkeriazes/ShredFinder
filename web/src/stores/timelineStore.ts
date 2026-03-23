@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Track, TimelineClip } from '../types';
+import type { Track, TimelineClip, ClipTransition } from '../types';
 
 interface HistoryEntry {
   tracks: Track[];
@@ -15,6 +15,7 @@ interface TimelineState {
   selectedClipId: string | null;
   history: HistoryEntry[];
   historyIndex: number;
+  lastModified: number;
 
   // Track actions
   addTrack: (type: 'video' | 'audio') => void;
@@ -22,6 +23,7 @@ interface TimelineState {
   toggleTrackMute: (id: string) => void;
   toggleTrackLock: (id: string) => void;
   toggleTrackVisibility: (id: string) => void;
+  soloTrack: (id: string) => void;
 
   // Clip actions
   addClip: (trackId: string, clip: Omit<TimelineClip, 'id' | 'trackId'>) => void;
@@ -31,6 +33,7 @@ interface TimelineState {
   splitClip: (id: string, position: number) => void;
   selectClip: (id: string | null) => void;
   updateClip: (id: string, partial: Partial<Pick<TimelineClip, 'speed' | 'volume' | 'opacity'>>) => void;
+  setClipTransition: (clipId: string, transition: ClipTransition | undefined) => void;
 
   // Playback
   setPlayhead: (time: number) => void;
@@ -91,6 +94,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
   selectedClipId: null,
   history: [],
   historyIndex: -1,
+  lastModified: 0,
 
   addTrack: (type) => {
     get().pushHistory();
@@ -116,6 +120,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       tracks: state.tracks.map((t) =>
         t.id === id ? { ...t, muted: !t.muted } : t
       ),
+      lastModified: Date.now(),
     }));
   },
 
@@ -124,6 +129,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       tracks: state.tracks.map((t) =>
         t.id === id ? { ...t, locked: !t.locked } : t
       ),
+      lastModified: Date.now(),
     }));
   },
 
@@ -132,6 +138,16 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       tracks: state.tracks.map((t) =>
         t.id === id ? { ...t, visible: !t.visible } : t
       ),
+      lastModified: Date.now(),
+    }));
+  },
+
+  soloTrack: (id) => {
+    set((state) => ({
+      tracks: state.tracks.map((t) =>
+        t.id === id ? { ...t, muted: false } : { ...t, muted: true }
+      ),
+      lastModified: Date.now(),
     }));
   },
 
@@ -244,6 +260,20 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
     }));
   },
 
+  setClipTransition: (clipId, transition) => {
+    get().pushHistory();
+    set((state) => ({
+      tracks: state.tracks.map((t) => ({
+        ...t,
+        clips: t.clips.map((c) =>
+          c.id === clipId
+            ? { ...c, transitionIn: transition?.type === 'none' ? undefined : transition }
+            : c
+        ),
+      })),
+    }));
+  },
+
   setPlayhead: (time) => set({ playheadPosition: Math.max(0, time) }),
 
   play: () => set({ isPlaying: true }),
@@ -261,7 +291,7 @@ export const useTimelineStore = create<TimelineState>()((set, get) => ({
       playheadPosition,
     });
     if (newHistory.length > 50) newHistory.shift();
-    set({ history: newHistory, historyIndex: newHistory.length - 1 });
+    set({ history: newHistory, historyIndex: newHistory.length - 1, lastModified: Date.now() });
   },
 
   undo: () => {

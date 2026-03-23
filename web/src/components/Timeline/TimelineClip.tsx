@@ -13,9 +13,10 @@ const TYPE_COLORS: Record<string, string> = {
 interface TimelineClipProps {
   clip: TimelineClipType;
   pixelsPerSecond: number;
+  trackLocked?: boolean;
 }
 
-export function TimelineClipComponent({ clip, pixelsPerSecond }: TimelineClipProps) {
+export function TimelineClipComponent({ clip, pixelsPerSecond, trackLocked = false }: TimelineClipProps) {
   const selectedClipId = useTimelineStore((s) => s.selectedClipId);
   const selectClip = useTimelineStore((s) => s.selectClip);
   const moveClip = useTimelineStore((s) => s.moveClip);
@@ -37,6 +38,7 @@ export function TimelineClipComponent({ clip, pixelsPerSecond }: TimelineClipPro
       if (e.button !== 0) return;
       e.stopPropagation();
       selectClip(clip.id);
+      if (trackLocked) return;
 
       dragRef.current = { startX: e.clientX, startTime: clip.startTime };
 
@@ -55,12 +57,13 @@ export function TimelineClipComponent({ clip, pixelsPerSecond }: TimelineClipPro
       document.addEventListener('mousemove', handleMove);
       document.addEventListener('mouseup', handleUp);
     },
-    [clip.id, clip.startTime, clip.trackId, pixelsPerSecond, selectClip, moveClip]
+    [clip.id, clip.startTime, clip.trackId, pixelsPerSecond, selectClip, moveClip, trackLocked]
   );
 
   const handleTrimLeft = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
+      if (trackLocked) return;
       selectClip(clip.id);
       const startX = e.clientX;
       const origTrimStart = clip.trimStart;
@@ -79,12 +82,13 @@ export function TimelineClipComponent({ clip, pixelsPerSecond }: TimelineClipPro
       document.addEventListener('mousemove', handleMove);
       document.addEventListener('mouseup', handleUp);
     },
-    [clip.id, clip.trimStart, clip.trimEnd, pixelsPerSecond, selectClip, trimClip]
+    [clip.id, clip.trimStart, clip.trimEnd, pixelsPerSecond, selectClip, trimClip, trackLocked]
   );
 
   const handleTrimRight = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
+      if (trackLocked) return;
       selectClip(clip.id);
       const startX = e.clientX;
       const origTrimEnd = clip.trimEnd;
@@ -103,11 +107,12 @@ export function TimelineClipComponent({ clip, pixelsPerSecond }: TimelineClipPro
       document.addEventListener('mousemove', handleMove);
       document.addEventListener('mouseup', handleUp);
     },
-    [clip.id, clip.trimStart, clip.trimEnd, pixelsPerSecond, selectClip, trimClip]
+    [clip.id, clip.trimStart, clip.trimEnd, pixelsPerSecond, selectClip, trimClip, trackLocked]
   );
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (trackLocked) return;
     e.stopPropagation();
     selectClip(clip.id);
     setContextMenu({ x: e.clientX, y: e.clientY });
@@ -122,9 +127,9 @@ export function TimelineClipComponent({ clip, pixelsPerSecond }: TimelineClipPro
   return (
     <>
       <div
-        className={`absolute top-1 bottom-1 flex cursor-grab select-none items-center overflow-hidden rounded border ${colorClass} ${
+        className={`absolute top-1 bottom-1 flex select-none items-center overflow-hidden rounded border ${colorClass} ${
           isSelected ? 'ring-2 ring-white/50' : ''
-        } active:cursor-grabbing`}
+        } ${trackLocked ? 'cursor-not-allowed opacity-60' : 'cursor-grab active:cursor-grabbing'}`}
         style={{ left, width: Math.max(width, 4) }}
         onMouseDown={handleMouseDown}
         onContextMenu={handleContextMenu}

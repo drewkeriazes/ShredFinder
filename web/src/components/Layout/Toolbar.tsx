@@ -39,6 +39,8 @@ export function Toolbar() {
     }
     setExporting(true);
     try {
+      // Save the project (including timeline state) before exporting
+      await saveProject();
       const job = await renderApi.submit(currentProject.id);
       // Poll for render completion
       const poll = async (): Promise<void> => {
@@ -60,7 +62,7 @@ export function Toolbar() {
     } finally {
       setExporting(false);
     }
-  }, [currentProject]);
+  }, [currentProject, saveProject]);
 
   useEffect(() => {
     if (editingName && nameInputRef.current) {

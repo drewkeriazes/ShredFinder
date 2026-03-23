@@ -2,7 +2,9 @@
 
 import json
 import logging
+import traceback
 
+import server.models  # noqa: F401 — register all models so relationships resolve
 from server.models.base import async_session_factory
 from server.services.renderer import render_timeline
 
@@ -67,7 +69,8 @@ async def render_project_task(project_id: str, job_id: str, ws_manager=None) -> 
                     }))
 
         except Exception as e:
-            logger.exception("Render task failed for job %s: %s", job_id, e)
+            logger.error("Render task failed for job %s: %s\n%s",
+                         job_id, e, traceback.format_exc())
             render_jobs[job_id]["status"] = "error"
             render_jobs[job_id]["error"] = str(e)
 

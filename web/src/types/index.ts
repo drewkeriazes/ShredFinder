@@ -4,12 +4,20 @@ export interface User {
   email: string;
 }
 
+export type TransitionType = 'none' | 'crossfade' | 'fade-from-black' | 'fade-to-black' | 'wipe-left' | 'wipe-right';
+
+export interface ClipTransition {
+  type: TransitionType;
+  duration: number; // seconds, default 0.5
+}
+
 export interface Project {
   id: string;
   name: string;
   createdAt: string;
   updatedAt: string;
   timeline: TimelineState;
+  timeline_data?: string;
 }
 
 export interface MediaFile {
@@ -65,6 +73,7 @@ export interface TimelineClip {
   speed?: number;
   volume?: number;
   opacity?: number;
+  transitionIn?: ClipTransition;
 }
 
 export interface TimelineState {

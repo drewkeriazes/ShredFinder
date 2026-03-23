@@ -1,5 +1,6 @@
 import { useTimelineStore } from '../../stores/timelineStore';
-import { Settings, Film, Music, Scissors } from 'lucide-react';
+import { Settings, Film, Music, Scissors, Sparkles } from 'lucide-react';
+import type { TransitionType } from '../../types';
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -13,6 +14,7 @@ export function InspectorPanel() {
   const getSelectedClip = useTimelineStore((s) => s.getSelectedClip);
   const trimClip = useTimelineStore((s) => s.trimClip);
   const updateClip = useTimelineStore((s) => s.updateClip);
+  const setClipTransition = useTimelineStore((s) => s.setClipTransition);
 
   const clip = getSelectedClip();
 
@@ -147,6 +149,65 @@ export function InspectorPanel() {
                 className="w-full rounded border border-zinc-600 bg-zinc-700 px-2 py-1 text-xs text-zinc-200 outline-none focus:border-blue-500"
               />
             </div>
+          </div>
+        </section>
+
+        {/* Transition */}
+        <section className="mb-4">
+          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            <Sparkles className="h-3.5 w-3.5" />
+            Transition
+          </h3>
+          <div className="space-y-2 rounded-lg bg-zinc-800 p-3">
+            <div>
+              <label className="mb-1 block text-[10px] text-zinc-500">
+                Type
+              </label>
+              <select
+                value={clip.transitionIn?.type ?? 'none'}
+                onChange={(e) => {
+                  const type = e.target.value as TransitionType;
+                  if (type === 'none') {
+                    setClipTransition(clip.id, undefined);
+                  } else {
+                    setClipTransition(clip.id, {
+                      type,
+                      duration: clip.transitionIn?.duration ?? 0.5,
+                    });
+                  }
+                }}
+                className="w-full rounded border border-zinc-600 bg-zinc-700 px-2 py-1 text-xs text-zinc-200 outline-none focus:border-blue-500"
+              >
+                <option value="none">None</option>
+                <option value="crossfade">Crossfade</option>
+                <option value="fade-from-black">Fade from Black</option>
+                <option value="fade-to-black">Fade to Black</option>
+                <option value="wipe-left">Wipe Left</option>
+                <option value="wipe-right">Wipe Right</option>
+              </select>
+            </div>
+            {clip.transitionIn && clip.transitionIn.type !== 'none' && (
+              <div>
+                <label className="mb-1 block text-[10px] text-zinc-500">
+                  Duration (s)
+                </label>
+                <input
+                  type="number"
+                  min={0.1}
+                  max={3.0}
+                  step={0.1}
+                  value={clip.transitionIn.duration}
+                  onChange={(e) => {
+                    const duration = Math.min(3.0, Math.max(0.1, parseFloat(e.target.value) || 0.5));
+                    setClipTransition(clip.id, {
+                      type: clip.transitionIn!.type,
+                      duration,
+                    });
+                  }}
+                  className="w-full rounded border border-zinc-600 bg-zinc-700 px-2 py-1 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                />
+              </div>
+            )}
           </div>
         </section>
 
