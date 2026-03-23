@@ -104,7 +104,7 @@ async def upload_media(
         status="processing",
     )
     session.add(media)
-    await session.flush()
+    await session.commit()
     await session.refresh(media)
 
     # Kick off background processing
@@ -112,7 +112,23 @@ async def upload_media(
     background_tasks.add_task(generate_proxy_task, media.id, ws_manager)
     background_tasks.add_task(extract_thumbnails_task, media.id, ws_manager)
 
-    return media
+    # Return response directly — new upload has no clips yet, avoid lazy-load issue
+    return MediaResponse(
+        id=media.id,
+        user_id=media.user_id,
+        original_filename=media.original_filename,
+        storage_path=media.storage_path,
+        proxy_path=media.proxy_path,
+        thumbnail_path=media.thumbnail_path,
+        duration=media.duration,
+        width=media.width,
+        height=media.height,
+        fps=media.fps,
+        codec=media.codec,
+        file_size=media.file_size,
+        status=media.status,
+        clips=[],
+    )
 
 
 @router.get("", response_model=list[MediaResponse])
