@@ -90,9 +90,7 @@ async def render_timeline(project_id: str, job_id: str, session: AsyncSession,
     transition_duration = timeline.get("transition_duration", 0.5)
 
     # Output path
-    output_dir = settings.RENDER_DIR / project.user_id
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / f"{job_id}.mp4"
+    output_path, _ = storage.render_path(project.user_id, job_id)
 
     try:
         await ffmpeg.render_concat(

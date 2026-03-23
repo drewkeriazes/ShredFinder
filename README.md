@@ -1,14 +1,124 @@
 # ShredFinder
 
-Automatically detect highlight moments in GoPro snowboard footage and cut clips. Analyzes embedded sensor telemetry (accelerometer, gyroscope, GPS) to find jumps, spins, speed peaks, and crashes — then cuts clips via FFmpeg with no re-encoding.
+Automatically detect highlight moments in GoPro snowboard footage and cut clips. Analyzes embedded sensor telemetry (accelerometer, gyroscope, GPS) to find jumps, spins, speed peaks, and crashes — then cut clips via FFmpeg with no re-encoding.
+
+Includes a **web-based video editor** for assembling detected clips into polished edits with a DaVinci Resolve-style interface.
 
 ---
 
-## Easy Setup (Non-Developers)
+## Web Editor (New)
+
+A full-featured browser-based video editor built on top of ShredFinder's detection engine.
+
+### Features
+
+- **Auto-Detection** — Upload GoPro footage, ShredFinder detects jumps, spins, speed peaks, and crashes automatically
+- **Timeline Editor** — Multi-track timeline with drag-and-drop, trim, split, and reorder
+- **Preview Player** — Real-time video playback synced to the timeline
+- **Clip Library** — Browse detected clips by type, filter, sort by confidence
+- **Inspector** — Adjust speed, volume, opacity per clip
+- **Export** — Server-side FFmpeg rendering with transitions
+- **Keyboard Shortcuts** — Space (play/pause), J/K/L (shuttle), arrows (frame step), Ctrl+Z/Y (undo/redo)
+- **Multi-User** — JWT authentication, per-user storage and projects
+- **Dark Theme** — DaVinci Resolve-inspired dark UI
+
+### Quick Start
+
+```bash
+# 1. Install Python dependencies
+pip install -e .
+pip install "fastapi[standard]" "uvicorn[standard]" "sqlalchemy[asyncio]" \
+    aiosqlite "python-jose[cryptography]" bcrypt python-multipart \
+    pydantic-settings websockets aiofiles
+
+# 2. Install frontend dependencies
+cd web && npm install && cd ..
+
+# 3. Start the backend (Terminal 1)
+python -m uvicorn server.main:app --reload
+
+# 4. Start the frontend (Terminal 2)
+cd web && npm run dev
+```
+
+Open **http://localhost:5173** — register an account, upload GoPro footage, and start editing.
+
+The API docs are at **http://localhost:8000/docs** (Swagger UI).
+
+### Architecture
+
+```
+Browser (React + TypeScript)          Python Backend (FastAPI)
+┌─────────────────────────┐           ┌──────────────────────┐
+│ Clip Library             │           │ ShredFinder Pipeline │
+│ Timeline Editor          │  REST +   │ FFmpeg Processing    │
+│ Preview Player           │◄─────────►│ JWT Auth             │
+│ Inspector Panel          │  WebSocket│ SQLite Database      │
+│ Zustand State Management │           │ File Storage         │
+└─────────────────────────┘           └──────────────────────┘
+```
+
+### File Storage Layout
+
+All uploaded and processed files are organized per-user, per-media:
+
+```
+server/data/
+  shredfinder.db                              # SQLite database
+  users/
+    {user_id}/
+      media/
+        {media_id}/
+          original.mp4                        # Uploaded GoPro file
+          proxy.mp4                           # 720p editing proxy
+          thumbnail.jpg                       # Poster frame
+      renders/
+        {job_id}.mp4                          # Exported videos
+```
+
+### Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS v4 |
+| State | Zustand (timeline, auth, media, projects) |
+| UI | Radix UI, Lucide icons, react-resizable-panels, dnd-kit |
+| Backend | FastAPI, SQLAlchemy (async), aiosqlite |
+| Auth | JWT (python-jose), bcrypt |
+| Video | FFmpeg (subprocess), ffprobe |
+| Real-time | WebSocket (progress updates) |
+
+### API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/register` | Create account |
+| POST | `/api/auth/login` | Get JWT token (OAuth2 form) |
+| GET | `/api/auth/me` | Current user profile |
+| GET | `/api/media` | List uploaded media |
+| POST | `/api/media/upload` | Upload video file |
+| GET | `/api/media/{id}/stream` | Stream original video |
+| GET | `/api/media/{id}/thumbnail` | Serve thumbnail |
+| GET | `/api/media/{id}/proxy` | Serve proxy video |
+| POST | `/api/detection/run/{media_id}` | Trigger ShredFinder detection |
+| GET | `/api/detection/results/{media_id}` | Get detected clips |
+| GET/POST | `/api/projects` | List/create projects |
+| GET/PUT/DELETE | `/api/projects/{id}` | Project CRUD |
+| POST | `/api/render` | Submit timeline for export |
+| GET | `/api/render/{job_id}/status` | Render progress |
+| GET | `/api/render/{job_id}/download` | Download rendered video |
+
+---
+
+## CLI Tool
+
+The original command-line tool for batch processing GoPro footage.
+
+### Easy Setup (Non-Developers)
 
 If you just want to use ShredFinder and don't have a coding background, follow these steps. You'll only need to do the setup once — after that it's just one command to process your footage.
 
-### Step 1: Install Python
+#### Step 1: Install Python
 
 1. Go to https://www.python.org/downloads/
 2. Click the big yellow **"Download Python"** button
@@ -21,7 +131,7 @@ python --version
 ```
 You should see something like `Python 3.13.7`. If you get an error, restart your computer and try again.
 
-### Step 2: Install FFmpeg
+#### Step 2: Install FFmpeg
 
 1. Open **Command Prompt** (search "cmd" in the Start menu)
 2. Paste this command and hit Enter:
@@ -30,7 +140,7 @@ winget install Gyan.FFmpeg
 ```
 3. Close and reopen Command Prompt after it finishes
 
-### Step 3: Download ShredFinder
+#### Step 3: Download ShredFinder
 
 1. Go to https://github.com/drewkeriazes/ShredFinder
 2. Click the green **"Code"** button, then click **"Download ZIP"**
@@ -44,7 +154,7 @@ cd Desktop\ShredFinder-master
 pip install -e .
 ```
 
-### Step 4: Process Your GoPro Footage
+#### Step 4: Process Your GoPro Footage
 
 1. Plug in your GoPro SD card or copy your `.MP4` files to a folder on your computer
 2. Open **Command Prompt** and run:
@@ -63,25 +173,12 @@ Each run gets its own folder with a unique ID so you can compare different runs 
 
 ### Common Options
 
+```bash
+shredfinder "D:\DCIM\100GOPRO" --dry-run          # Preview without cutting
+shredfinder "D:\DCIM\100GOPRO" --trail-map         # Interactive GPS map
+shredfinder "D:\DCIM\100GOPRO" --reel --top-n 10   # Highlight reel of top 10
+shredfinder "D:\DCIM\100GOPRO" --stats              # Season statistics
 ```
-shredfinder "D:\DCIM\100GOPRO" --dry-run
-```
-Preview what it finds without cutting any clips (good for testing).
-
-```
-shredfinder "D:\DCIM\100GOPRO" --trail-map
-```
-Generate an interactive map of your GPS tracks you can open in a browser.
-
-```
-shredfinder "D:\DCIM\100GOPRO" --reel --top-n 10
-```
-Automatically create a highlight reel of your 10 best moments.
-
-```
-shredfinder "D:\DCIM\100GOPRO" --stats
-```
-See your season stats — top speed, biggest air, vertical feet, etc.
 
 ### Troubleshooting
 
@@ -95,30 +192,25 @@ See your season stats — top speed, biggest air, vertical feet, etc.
 
 ## Developer Setup
 
-Everything below is the full technical documentation.
-
-## Requirements
+### Requirements
 
 - **Python** 3.10+
-- **FFmpeg** installed and on PATH (or via WinGet/Chocolatey on Windows)
+- **FFmpeg** installed and on PATH
+- **Node.js** 18+ (for web editor)
 
-## Install
+### Install
 
 ```bash
-# Clone and install in editable mode
+# Clone and install
 git clone <repo-url>
 cd ShredFinder
 pip install -e .
 
-# Verify
+# Verify CLI
 shredfinder --help
-```
 
-Or without installing:
-
-```bash
-pip install click pandas numpy
-python -m shredfinder --help
+# Install web editor dependencies
+cd web && npm install && cd ..
 ```
 
 ### Installing FFmpeg
@@ -135,7 +227,7 @@ brew install ffmpeg
 sudo apt install ffmpeg
 ```
 
-## Quick Start
+## CLI Usage
 
 ```bash
 # Basic: detect events and cut clips
@@ -147,25 +239,6 @@ shredfinder ./footage --dry-run
 # Full run with all features
 shredfinder ./footage --export-edl --export-gpx --trail-map --stats --reel
 ```
-
-## Commands & Options
-
-### Basic Usage
-
-```bash
-shredfinder INPUT_DIR [OPTIONS]
-```
-
-`INPUT_DIR` is a folder containing raw GoPro `.MP4` files.
-
-### Output Options
-
-| Flag | Description |
-|------|-------------|
-| `-o, --output-dir DIR` | Output directory (default: `./clips`) |
-| `--no-organize` | Flat output instead of subfolders by type |
-| `--dry-run` | Detect events but don't cut clips |
-| `-v, --verbose` | Debug logging |
 
 ### Detection Tuning
 
@@ -209,19 +282,13 @@ clips/
     spins/             Spin clips (filenames include degree count)
     crashes/           Crash/bail clips
     by_source/         Symlinks grouped by source MP4 file
-      GX010185/
-      GX010207/
     timeline.edl       DaVinci Resolve timeline (with --export-edl)
     tracks.gpx         GPS tracks + waypoints (with --export-gpx)
     trail_map.html     Interactive map (with --trail-map)
     stats.txt          Season stats text (with --stats)
     stats.json         Season stats JSON (with --stats)
     highlight_reel.mp4 Top clips concatenated (with --reel)
-  run_20260321_150000_7e2d9f41/
-    ...                Another run with different settings
 ```
-
-The `run.json` file records the run ID, input directory, all detection settings, and results so you can compare runs.
 
 ## Config File
 
@@ -248,10 +315,6 @@ organize = true
 [[footage]]
 path = "/path/to/gopro/day1"
 label = "Day 1"
-
-[[footage]]
-path = "/path/to/gopro/day2"
-label = "Day 2"
 ```
 
 Config is loaded from (first found):
@@ -260,14 +323,6 @@ Config is loaded from (first found):
 3. `~/shredfinder.toml`
 
 CLI flags override config values.
-
-## Batch Processing
-
-Process all directories listed in your config:
-
-```bash
-python run_all.py
-```
 
 ## Event Detection
 
@@ -286,69 +341,73 @@ High-G spike (> `crash_g_threshold`) combined with GPS deceleration to zero and 
 ### Chairlift Filtering
 GPS altitude + speed analysis automatically classifies segments as riding, chairlift, or stationary. Events during non-riding segments are filtered out. Disable with `--no-chairlift-filter`.
 
-## Development
-
-```bash
-# Install dev dependencies
-pip install -e .
-pip install pytest
-
-# Run tests
-python -m pytest tests/ -v
-
-# Run tests with coverage
-python -m pytest tests/ -v --tb=short
-
-# Run a specific test class
-python -m pytest tests/test_detector.py::TestDetectSpins -v
-
-# Quick import check
-python -c "import shredfinder; print(shredfinder.__version__)"
-```
-
 ## Project Structure
 
 ```
-shredfinder/
-  __main__.py       Enables `python -m shredfinder`
-  cli.py            Click CLI entry point
-  scanner.py        MP4 file discovery
-  telemetry.py      GPMF extraction, DataFrame building, segment classification
-  gpmf_parser.py    Binary GPMF (KLV) format parser
-  detector.py       Jump/spin/speed/crash detection + landing quality
-  clipper.py        Parallel FFmpeg clip cutting with organized output
-  report.py         CSV manifest + text summary
-  config.py         TOML config file management
-  session.py        Session grouping by date/location
-  reel.py           Event ranking + highlight reel generation
-  stats.py          Season stats aggregation
-  trail_map.py      Interactive HTML trail map (Leaflet.js)
-  edl_export.py     DaVinci Resolve EDL export
-  gpx_export.py     GPX track + waypoint export
-  footage_dirs.py   Footage directory helpers (configure via shredfinder.toml)
-tests/
-  test_detector.py  Detection tests (jumps, spins, crashes, landing quality)
-  test_gpmf_parser.py  GPMF binary parsing tests
-  test_scanner.py   File discovery tests
-  test_telemetry.py DataFrame building tests (ACCL, GPS, GYRO)
+ShredFinder/
+  shredfinder/              # CLI detection pipeline
+    cli.py                  Click CLI entry point
+    scanner.py              MP4 file discovery
+    telemetry.py            GPMF extraction, DataFrame building
+    gpmf_parser.py          Binary GPMF (KLV) format parser
+    detector.py             Jump/spin/speed/crash detection
+    clipper.py              Parallel FFmpeg clip cutting
+    report.py               CSV manifest + text summary
+    config.py               TOML config management
+    session.py              Session grouping by date/location
+    reel.py                 Highlight reel generation
+    stats.py                Season stats aggregation
+    trail_map.py            Interactive HTML trail map
+    edl_export.py           DaVinci Resolve EDL export
+    gpx_export.py           GPX track + waypoint export
+  server/                   # Web editor backend
+    main.py                 FastAPI app, WebSocket, CORS
+    config.py               Settings (pydantic-settings)
+    api/                    REST endpoints
+      auth.py               Register, login, JWT
+      media.py              Upload, stream, thumbnail, proxy
+      detection.py          Trigger ShredFinder, get results
+      projects.py           Project CRUD
+      render.py             Export/render jobs
+    models/                 SQLAlchemy ORM
+      user.py               User accounts
+      media.py              Uploaded media files
+      project.py            Projects, clips
+    services/               Business logic
+      ffmpeg.py             FFmpeg command runner
+      proxy.py              Proxy/thumbnail generation
+      renderer.py           Timeline rendering
+      storage.py            File storage abstraction
+    tasks/                  Background tasks
+      detection.py          ShredFinder pipeline runner
+      proxy.py              Proxy/thumbnail tasks
+      render.py             Render tasks
+  web/                      # Web editor frontend
+    src/
+      components/           React UI components
+        Auth/               Login/register page
+        Layout/             App shell, toolbar
+        Library/            Clip browser, upload
+        Timeline/           Tracks, clips, playhead
+        Preview/            Video player
+        Inspector/          Clip properties
+      stores/               Zustand state management
+      services/             API client, WebSocket
+      hooks/                Keyboard shortcuts, timeline helpers
+      types/                TypeScript interfaces
+  tests/                    CLI detection tests
 ```
 
-## Examples
+## Development
 
 ```bash
-# Detect with relaxed thresholds (find more events)
-shredfinder ./footage --g-threshold 6.0 --min-landing-g 10 --min-speed-mph 10
+# Run CLI tests
+python -m pytest tests/ -v
 
-# Strict detection (fewer, higher quality clips)
-shredfinder ./footage --g-threshold 3.0 --min-landing-g 20 --min-airtime-sec 0.5
+# Start web editor (dev mode)
+python -m uvicorn server.main:app --reload   # backend
+cd web && npm run dev                         # frontend
 
-# Just spins and jumps, no speed events
-shredfinder ./footage --min-speed-mph 100
-
-# Generate everything for a full day
-shredfinder ./footage \
-  --export-edl --export-gpx --trail-map --stats --reel --top-n 15
-
-# Process with verbose debug logging
-shredfinder ./footage --dry-run -v 2>debug.log
+# Build frontend for production
+cd web && npm run build
 ```

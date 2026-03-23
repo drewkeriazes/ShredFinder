@@ -58,15 +58,23 @@ export function PreviewPlayer() {
     return null;
   }, [selectedClipId, tracks, playheadPosition]);
 
-  // Resolve media URL for the active clip
+  // Preview from library selection
+  const previewMediaId = useMediaStore((s) => s.previewMediaId);
+
+  // Resolve media URL: timeline clip takes priority, then library preview
   const videoSrc = useMemo(() => {
-    if (!activeClip) return '';
-    const media = mediaFiles.find((m) => m.id === activeClip.mediaId);
-    if (media) {
-      return mediaApi.proxyUrl(media.id);
+    if (activeClip) {
+      const media = mediaFiles.find((m) => m.id === activeClip.mediaId);
+      if (media) {
+        return mediaApi.streamUrl(media.id);
+      }
+      return mediaApi.streamUrl(activeClip.mediaId);
     }
-    return mediaApi.streamUrl(activeClip.mediaId);
-  }, [activeClip, mediaFiles]);
+    if (previewMediaId) {
+      return mediaApi.streamUrl(previewMediaId);
+    }
+    return '';
+  }, [activeClip, mediaFiles, previewMediaId]);
 
   // Update video src when active clip changes
   useEffect(() => {

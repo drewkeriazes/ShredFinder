@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
@@ -95,6 +95,27 @@ async def get_current_user(
     session: AsyncSession = Depends(get_session),
 ) -> User:
     """FastAPI dependency that extracts and validates the current user from a JWT."""
+    user_id = verify_token(token)
+    result = await session.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
+    return user
+
+
+async def get_current_user_or_token_param(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> User:
+    """Accept auth from header OR ?token= query param. Used for img/video src URLs."""
+    from fastapi import Query
+    token = request.query_params.get("token")
+    if not token:
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     user_id = verify_token(token)
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()

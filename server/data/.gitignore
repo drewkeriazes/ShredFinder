@@ -1,0 +1,3 @@
+# Ignore all runtime data — DB, uploads, proxies, thumbnails, renders
+*
+!.gitignore

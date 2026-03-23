@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
-from server.api.auth import get_current_user
+from server.api.auth import get_current_user, get_current_user_or_token_param
 from server.models.base import get_session
 from server.models.media import Media
 from server.models.user import User
@@ -40,11 +40,7 @@ class ClipResponse(BaseModel):
 
 class MediaResponse(BaseModel):
     id: str
-    user_id: str
-    original_filename: str
-    storage_path: str
-    proxy_path: str | None = None
-    thumbnail_path: str | None = None
+    filename: str
     duration: float | None = None
     width: int | None = None
     height: int | None = None
@@ -52,9 +48,42 @@ class MediaResponse(BaseModel):
     codec: str | None = None
     file_size: int | None = None
     status: str
+    thumbnailUrl: str | None = None
+    proxyUrl: str | None = None
     clips: list[ClipResponse] = []
 
-    model_config = {"from_attributes": True}
+
+def _media_to_response(media: Media, clips: list | None = None) -> MediaResponse:
+    """Convert a Media ORM object to a MediaResponse with proper URLs."""
+    thumbnail_url = f"/api/media/{media.id}/thumbnail" if media.thumbnail_path else None
+    proxy_url = f"/api/media/{media.id}/stream" if media.storage_path else None
+    clip_list = []
+    if clips is not None:
+        for c in clips:
+            meta = c.metadata if isinstance(c.metadata, dict) else {}
+            if isinstance(c.metadata, str):
+                try:
+                    meta = json.loads(c.metadata)
+                except Exception:
+                    meta = {}
+            clip_list.append(ClipResponse(
+                id=c.id, name=c.name, clip_type=c.clip_type,
+                start_time=c.start_time, end_time=c.end_time, metadata=meta,
+            ))
+    return MediaResponse(
+        id=media.id,
+        filename=media.original_filename,
+        duration=media.duration,
+        width=media.width,
+        height=media.height,
+        fps=media.fps,
+        codec=media.codec,
+        file_size=media.file_size,
+        status=media.status,
+        thumbnailUrl=thumbnail_url,
+        proxyUrl=proxy_url,
+        clips=clip_list,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -80,8 +109,18 @@ async def upload_media(
 
     filename = upload_file.filename or "video.mp4"
 
-    # Save to storage
-    rel_path = await storage.save_upload(upload_file, current_user.id, filename)
+    # Create media record first to get the ID for file organization
+    media = Media(
+        user_id=current_user.id,
+        original_filename=filename,
+        storage_path="",  # set after save
+        status="processing",
+    )
+    session.add(media)
+    await session.flush()  # generates the ID
+
+    # Save to organized path: users/{user_id}/media/{media_id}/original.mp4
+    rel_path = await storage.save_upload(upload_file, current_user.id, media.id)
     abs_path = storage.get_file_path(rel_path)
     file_size = abs_path.stat().st_size
 
@@ -91,19 +130,13 @@ async def upload_media(
     except Exception:
         info = {}
 
-    media = Media(
-        user_id=current_user.id,
-        original_filename=filename,
-        storage_path=rel_path,
-        duration=info.get("duration"),
-        width=info.get("width"),
-        height=info.get("height"),
-        fps=info.get("fps"),
-        codec=info.get("codec"),
-        file_size=file_size,
-        status="processing",
-    )
-    session.add(media)
+    media.storage_path = rel_path
+    media.duration = info.get("duration")
+    media.width = info.get("width")
+    media.height = info.get("height")
+    media.fps = info.get("fps")
+    media.codec = info.get("codec")
+    media.file_size = file_size
     await session.commit()
     await session.refresh(media)
 
@@ -112,23 +145,7 @@ async def upload_media(
     background_tasks.add_task(generate_proxy_task, media.id, ws_manager)
     background_tasks.add_task(extract_thumbnails_task, media.id, ws_manager)
 
-    # Return response directly — new upload has no clips yet, avoid lazy-load issue
-    return MediaResponse(
-        id=media.id,
-        user_id=media.user_id,
-        original_filename=media.original_filename,
-        storage_path=media.storage_path,
-        proxy_path=media.proxy_path,
-        thumbnail_path=media.thumbnail_path,
-        duration=media.duration,
-        width=media.width,
-        height=media.height,
-        fps=media.fps,
-        codec=media.codec,
-        file_size=media.file_size,
-        status=media.status,
-        clips=[],
-    )
+    return _media_to_response(media, clips=[])
 
 
 @router.get("", response_model=list[MediaResponse])
@@ -144,7 +161,7 @@ async def list_media(
         .order_by(Media.created_at.desc())
     )
     media_list = result.scalars().all()
-    return [_media_with_clips(m) for m in media_list]
+    return [_media_to_response(m, clips=list(m.clips)) for m in media_list]
 
 
 @router.get("/{media_id}", response_model=MediaResponse)
@@ -162,37 +179,14 @@ async def get_media(
     media = result.scalar_one_or_none()
     if media is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Media not found")
-    return _media_with_clips(media)
-
-
-def _media_with_clips(media: Media) -> MediaResponse:
-    """Convert a Media ORM object to a MediaResponse, parsing clip metadata."""
-    clips = []
-    for clip in media.clips:
-        meta = None
-        if clip.metadata_json:
-            try:
-                meta = json.loads(clip.metadata_json)
-            except json.JSONDecodeError:
-                pass
-        clips.append(ClipResponse(
-            id=clip.id,
-            name=clip.name,
-            clip_type=clip.clip_type,
-            start_time=clip.start_time,
-            end_time=clip.end_time,
-            metadata=meta,
-        ))
-    return MediaResponse.model_validate(media, from_attributes=True).model_copy(
-        update={"clips": clips}
-    )
+    return _media_to_response(media, clips=list(media.clips))
 
 
 @router.get("/{media_id}/stream")
 async def stream_media(
     media_id: str,
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_or_token_param),
     session: AsyncSession = Depends(get_session),
 ):
     """Stream the original video file with support for HTTP range requests (seeking)."""
@@ -224,7 +218,7 @@ async def stream_media(
 @router.get("/{media_id}/thumbnail")
 async def serve_thumbnail(
     media_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_or_token_param),
     session: AsyncSession = Depends(get_session),
 ):
     """Serve the thumbnail image for a media file."""
@@ -245,7 +239,7 @@ async def serve_thumbnail(
 @router.get("/{media_id}/proxy")
 async def serve_proxy(
     media_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_or_token_param),
     session: AsyncSession = Depends(get_session),
 ):
     """Serve the proxy video for a media file."""

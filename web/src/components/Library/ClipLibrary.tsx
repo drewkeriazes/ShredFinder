@@ -1,10 +1,12 @@
 import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
+import { useEffect } from 'react';
 import { ArrowDownUp, Loader2, Zap } from 'lucide-react';
 import { useMediaStore } from '../../stores/mediaStore';
 import { useTimelineStore } from '../../stores/timelineStore';
 import { ClipCard } from './ClipCard';
 import { UploadDropzone } from './UploadDropzone';
+import { mediaApi } from '../../services/api';
 import type { DetectedClip } from '../../types';
 
 const FILTERS = [
@@ -28,12 +30,20 @@ export function ClipLibrary() {
   const setSortBy = useMediaStore((s) => s.setSortBy);
   const filteredClips = useMediaStore((s) => s.filteredClips);
   const mediaFiles = useMediaStore((s) => s.mediaFiles);
+  const fetchMedia = useMediaStore((s) => s.fetchMedia);
   const runDetection = useMediaStore((s) => s.runDetection);
   const detectionStatus = useMediaStore((s) => s.detectionStatus);
+  const previewMediaId = useMediaStore((s) => s.previewMediaId);
+  const setPreviewMedia = useMediaStore((s) => s.setPreviewMedia);
   const addClip = useTimelineStore((s) => s.addClip);
   const tracks = useTimelineStore((s) => s.tracks);
 
   const clips = filteredClips();
+
+  // Fetch media on mount
+  useEffect(() => {
+    fetchMedia();
+  }, [fetchMedia]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -123,9 +133,25 @@ export function ClipLibrary() {
                 return (
                   <div
                     key={mf.id}
-                    className="flex items-center justify-between rounded bg-zinc-800 px-2 py-1.5"
+                    onClick={() => setPreviewMedia(mf.id)}
+                    className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 transition ${
+                      previewMediaId === mf.id
+                        ? 'bg-blue-600/20 ring-1 ring-blue-500'
+                        : 'bg-zinc-800 hover:bg-zinc-750'
+                    }`}
                   >
-                    <span className="truncate text-xs text-zinc-300">
+                    {mf.thumbnailUrl ? (
+                      <img
+                        src={mediaApi.thumbnailUrl(mf.id)}
+                        alt={mf.filename}
+                        className="h-8 w-14 rounded object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-14 items-center justify-center rounded bg-zinc-700 text-[8px] text-zinc-500">
+                        {mf.status === 'processing' ? '...' : 'No thumb'}
+                      </div>
+                    )}
+                    <span className="flex-1 truncate text-xs text-zinc-300">
                       {mf.filename}
                     </span>
                     {isProcessing ? (

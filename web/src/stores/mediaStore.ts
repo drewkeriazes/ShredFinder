@@ -13,6 +13,8 @@ interface MediaState {
   sortBy: SortBy;
   uploadProgress: Record<string, number>;
   detectionStatus: Record<string, 'queued' | 'running' | 'done' | 'error'>;
+  previewMediaId: string | null;
+  setPreviewMedia: (mediaId: string | null) => void;
   fetchMedia: () => Promise<void>;
   uploadFile: (file: File) => Promise<void>;
   deleteMedia: (id: string) => Promise<void>;
@@ -33,12 +35,15 @@ export const useMediaStore = create<MediaState>()((set, get) => ({
   sortBy: 'confidence',
   uploadProgress: {},
   detectionStatus: {},
+  previewMediaId: null,
+
+  setPreviewMedia: (mediaId) => set({ previewMediaId: mediaId }),
 
   fetchMedia: async () => {
     set({ loading: true, error: null });
     try {
-      const res = await mediaApi.list();
-      set({ mediaFiles: res.items, loading: false });
+      const files = await mediaApi.list();
+      set({ mediaFiles: files, loading: false });
     } catch (err) {
       set({
         error: err instanceof Error ? err.message : 'Failed to fetch media',
@@ -66,6 +71,15 @@ export const useMediaStore = create<MediaState>()((set, get) => ({
           uploadProgress: rest,
         };
       });
+      // Poll for thumbnail/proxy completion
+      setTimeout(async () => {
+        for (let i = 0; i < 30; i++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          await get().fetchMedia();
+          const updated = get().mediaFiles.find((m) => m.id === media.id);
+          if (updated?.status === 'ready' || updated?.status === 'error') break;
+        }
+      }, 1000);
     } catch (err) {
       set((state) => {
         const { [tempId]: _, ...rest } = state.uploadProgress;

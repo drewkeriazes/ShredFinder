@@ -114,7 +114,7 @@ export const projectsApi = {
 // Media
 export const mediaApi = {
   list: () =>
-    request<{ items: import('../types').MediaFile[] }>('/api/media'),
+    request<import('../types').MediaFile[]>('/api/media'),
   get: (id: string) =>
     request<import('../types').MediaFile>(`/api/media/${id}`),
   upload: (file: File, onProgress?: (pct: number) => void) => {
@@ -149,9 +149,18 @@ export const mediaApi = {
   },
   delete: (id: string) =>
     request<void>(`/api/media/${id}`, { method: 'DELETE' }),
-  streamUrl: (id: string) => `${BASE_URL}/api/media/${id}/stream`,
-  thumbnailUrl: (id: string) => `${BASE_URL}/api/media/${id}/thumbnail`,
-  proxyUrl: (id: string) => `${BASE_URL}/api/media/${id}/proxy`,
+  streamUrl: (id: string) => {
+    const token = getToken();
+    return `${BASE_URL}/api/media/${id}/stream${token ? `?token=${token}` : ''}`;
+  },
+  thumbnailUrl: (id: string) => {
+    const token = getToken();
+    return `${BASE_URL}/api/media/${id}/thumbnail${token ? `?token=${token}` : ''}`;
+  },
+  proxyUrl: (id: string) => {
+    const token = getToken();
+    return `${BASE_URL}/api/media/${id}/proxy${token ? `?token=${token}` : ''}`;
+  },
 };
 
 // Detection

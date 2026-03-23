@@ -3,7 +3,6 @@
 Loads from environment variables or a .env file in the project root.
 """
 
-import secrets
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -30,12 +29,9 @@ class Settings(BaseSettings):
     # --- Database ---
     DATABASE_URL: str = "sqlite+aiosqlite:///./server/data/shredfinder.db"
 
-    # --- Storage directories ---
+    # --- Storage ---
+    # All user files live under DATA_DIR/users/{user_id}/...
     DATA_DIR: Path = Path("server/data")
-    UPLOAD_DIR: Path = Path("server/data/uploads")
-    PROXY_DIR: Path = Path("server/data/proxies")
-    THUMBNAIL_DIR: Path = Path("server/data/thumbnails")
-    RENDER_DIR: Path = Path("server/data/renders")
 
     # --- FFmpeg ---
     FFMPEG_PATH: str = "ffmpeg"
@@ -45,11 +41,21 @@ class Settings(BaseSettings):
     PROXY_HEIGHT: int = 720
     PROXY_CRF: int = 23
 
+    def user_media_dir(self, user_id: str, media_id: str) -> Path:
+        """Get the directory for a specific media file's assets."""
+        d = self.DATA_DIR / "users" / user_id / "media" / media_id
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    def user_renders_dir(self, user_id: str) -> Path:
+        """Get the directory for a user's rendered exports."""
+        d = self.DATA_DIR / "users" / user_id / "renders"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
     def ensure_dirs(self) -> None:
-        """Create all storage directories if they don't exist."""
-        for d in (self.DATA_DIR, self.UPLOAD_DIR, self.PROXY_DIR,
-                  self.THUMBNAIL_DIR, self.RENDER_DIR):
-            d.mkdir(parents=True, exist_ok=True)
+        """Create base storage directory."""
+        self.DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 settings = Settings()
