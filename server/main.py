@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 
 from server.config import settings
 from server.models.base import init_db
+import server.models  # noqa: F401 — register all ORM models for relationship resolution
 
 logger = logging.getLogger(__name__)
 
